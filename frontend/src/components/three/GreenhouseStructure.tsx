@@ -539,25 +539,44 @@ export function GreenhouseStructure({ still = false }: { still?: boolean }) {
 /**
  * Siklus siang-malam.
  *
- * Sumber cahaya dipindah sepanjang busur dan warnanya berubah dari hangat (senja)
- * ke netral (siang) ke dingin (malam), supaya pola malam terbaca
- * tanpa harus membaca angka. Pada mode reduced motion, siklus berhenti total
- * dan cahaya diam di posisi siang - tidak ada gerakan yang berjalan pelan
- * pelan, karena itu tetap saja gerakan.
+ * Pakai waktu lokal asli (jam saat ini) supaya background berubah sesuai
+ * jam nyata, sesuai spesifikasi F3.3 di PLANNING.md. Perhitungan dilakukan
+ * hanya di presentation layer (L874).
+ *
+ * Elevasi matahari dihitung secara sederhana: 0 jam = tengah malam, 12 jam =
+ * zenit. Itu cukup untuk gradien siang/senja/malam tanpa perhitungan
+ * astronomi rumit.
  */
 export function DayNightCycle({ still }: { still: boolean }) {
   const sun = useRef<DirectionalLight>(null);
   const hemi = useRef<HemisphereLight>(null);
   const fog = useRef<Fog>(null);
-  const phase = useRef(0);
 
-  useFrame((_, delta) => {
-    if (still) return;
-    // cukup cepat untuk terlihat ketika halaman sedang dibuka.
-    phase.current = (phase.current + delta / 48) % 1;
+  useFrame(() => {
+    const now = new Date();
+    const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
 
-    const angle = phase.current * Math.PI * 2;
-    const elevation = Math.sin(angle);
+    // 0 = tengah malam, 0.5 = tengah hari (12:00)
+    const t = (hours % 24) / 24;
+    const angle = (t - 0.25) * Math.PI * 2; // matahari terbit di timur
+    const elevation = Math.sin((t - 0.25) * Math.PI * 2);
+
+    if (still) {
+      const dayAmountStill = Math.max(0, Math.sin((0.5 - 0.25) * Math.PI * 2)); // 12:00
+      if (sun.current) {
+        sun.current.position.set(0, 9, 3.2);
+        sun.current.color.setRGB(1, 0.96, 0.88);
+        sun.current.intensity = 1.35;
+      }
+      if (hemi.current) {
+        hemi.current.intensity = 0.35 + dayAmountStill * 0.75;
+      }
+      if (fog.current) {
+        fog.current.color.setRGB(0.07, 0.08, 0.11);
+      }
+      return;
+    }
+
     const dayAmount = Math.max(0, elevation);
 
     if (sun.current) {
@@ -566,7 +585,6 @@ export function DayNightCycle({ still }: { still: boolean }) {
         Math.max(0.6, elevation * 9),
         3.2,
       );
-      // Siang: putih hangat. Senja: jingga. Malam: moonlight biru redup.
       if (elevation > 0.25) {
         sun.current.color.setRGB(1, 0.96, 0.88);
         sun.current.intensity = 1.35;
@@ -584,7 +602,6 @@ export function DayNightCycle({ still }: { still: boolean }) {
     }
 
     if (fog.current) {
-      // Kabut gelap di malam hari supaya depth tetap terbaca.
       const night = 1 - dayAmount;
       fog.current.color.setRGB(
         0.05 + dayAmount * 0.07,
