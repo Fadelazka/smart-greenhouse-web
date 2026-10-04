@@ -10,6 +10,7 @@ import {
   type Thresholds,
 } from '../types/mqtt.js';
 import { createLogger } from '../utils/logger.js';
+import { sendTelegramAlert } from './telegram.service.js';
 
 const log = createLogger('alert');
 
@@ -144,5 +145,16 @@ export async function checkThresholds(
 
     broadcast(SOCKET_EVENTS.ALERT, alert);
     log.warn(message);
+
+    // Telegram adalah kanal tambahan, bukan jalur utama. Panggilannya tidak
+    // di-await supaya satu pesan yang lambat tidak menunda alert berikutnya, dan
+    // service-nya sendiri sudah menelan semua error jadi tidak ada Promise
+    // yang menggantung tanpa penanganan.
+    void sendTelegramAlert(key, severity, [
+      `${label}: ${value.toFixed(1)}${unit} ${direction}`,
+      `Rentang ideal ${limit.min}${unit} sampai ${limit.max}${unit}`,
+      `Perangkat ${payload.deviceId}`,
+      new Date().toLocaleString('id-ID'),
+    ]);
   }
 }

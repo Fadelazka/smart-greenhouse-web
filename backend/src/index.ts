@@ -11,7 +11,11 @@ import { controlRouter } from './routes/control.routes.js';
 import { logsRouter } from './routes/logs.routes.js';
 import { sensorRouter } from './routes/sensor.routes.js';
 import { settingsRouter } from './routes/settings.routes.js';
+import { weatherRouter } from './routes/weather.routes.js';
+import { notificationRouter } from './routes/notification.routes.js';
 import { getThresholds } from './services/alert.service.js';
+import { weatherStatus } from './services/weather.service.js';
+import { telegramStatus } from './services/telegram.service.js';
 import { createLogger } from './utils/logger.js';
 
 const log = createLogger('server');
@@ -47,6 +51,9 @@ app.get('/api/health', async (_req, res) => {
     database: db.usingFallback ? 'in-memory' : 'postgresql',
     readings,
     thresholds: await getThresholds().catch(() => null),
+    // Status fitur opsional ikut dilaporkan agar dashboard bisa menunjukkan apa
+    // yang aktif tanpa perlu menebak dari UI yang tidak muncul.
+    features: { weather: weatherStatus(), telegram: telegramStatus() },
     env: env.NODE_ENV,
   });
 });
@@ -56,6 +63,8 @@ app.use('/api/sensors', sensorRouter);
 app.use('/api/control', controlRouter);
 app.use('/api/logs', logsRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/weather', weatherRouter);
+app.use('/api/notifications', notificationRouter);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: `Endpoint ${req.method} ${req.path} tidak ditemukan.` });

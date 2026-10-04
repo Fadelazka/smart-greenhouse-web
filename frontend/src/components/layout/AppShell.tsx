@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useSensorStore } from '@/store/sensorStore';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { SoundToggle } from '@/components/alert/SoundToggle';
+import { WeatherOverlay } from '@/components/weather/WeatherOverlay';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { formatUptime } from '@/lib/utils';
@@ -238,6 +239,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
 
             <div className="ml-auto flex items-center gap-3">
+              <div className="hidden sm:block">
+                <WeatherOverlay />
+              </div>
               <SoundToggle />
               <Badge
                 variant={online ? 'success' : 'destructive'}

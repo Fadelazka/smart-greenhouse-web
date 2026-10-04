@@ -1,0 +1,49 @@
+{
+  "name": "Smart IoT Greenhouse",
+  "short_name": "Greenhouse",
+  "description": "Monitoring dan kontrol rumah hijau berbasis ESP32 secara real-time.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0F1F1A",
+  "theme_color": "#0F1F1A",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Ringkasan sensor dan status perangkat",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Visualisasi 3D",
+      "short_name": "Visualisasi",
+      "description": "Scene rumah kaca dan perangkat keras",
+      "url": "/visualisasi"
+    },
+    {
+      "name": "Riwayat",
+      "short_name": "Riwayat",
+      "description": "Grafik historis dan perbandingan periode",
+      "url": "/riwayat"
+    }
+  ]
+}

@@ -66,6 +66,15 @@ export const loginSchema = z.object({
 export const historyQuerySchema = z.object({
   range: z.enum(['1h', '6h', '24h', '7d']).default('24h'),
   bucket: z.coerce.number().int().min(1).max(1000).default(60),
+  /**
+   * Geser jendela waktu ke belakang sebanyak N kali panjang range.
+   *
+   * `offset=0` (default) berarti "sekarang sampai.range lalu". `offset=1`
+   * berarti "satu range sebelumnya", jadi dua rentang dengan panjang sama bisa
+   * dibandingkan tanpa query kedua. Dibatasi 30 supaya tidak bisa meminta
+   * jendela yang secara efektif tidak ada datanya.
+   */
+  offset: z.coerce.number().int().min(0).max(30).default(0),
 });
 
 export const actuatorControlSchema = z.object({

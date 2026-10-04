@@ -4,8 +4,19 @@ import { db } from '../db/client.js';
 import { getThresholds } from '../services/alert.service.js';
 import { DEVICE_ID } from '../types/mqtt.js';
 import { getQuery, validateQuery } from '../middleware/validate.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const sensorRouter = Router();
+
+/*
+ * Seluruh data greenhouse hanya untuk pengguna yang sudah login.
+ *
+ * Router ini dulu dipasang tanpa autentikasi, sehingga `/latest` dan
+ * `export.csv` bisa dibaca siapa saja tanpa token. Esp32 dan simulator
+ * tidak terdampak karena keduanya menulis lewat MQTT, bukan REST, dan
+ * frontend sudah mengirim token di setiap request.
+ */
+sensorRouter.use(requireAuth);
 
 const RANGE_MS: Record<HistoryQuery['range'], number> = {
   '1h': 60 * 60 * 1000,
@@ -28,16 +39,29 @@ function defaultBucket(range: HistoryQuery['range']): number {
   }
 }
 
+/**
+ * Jendela waktu untuk satu permintaan riwayat.
+ *
+ * `offset` menggeser jendela ke belakang sebanyak N kali panjang range, sehingga
+ * `offset=1` menghasilkan periode sepanjang `range` yang tepat berada di depan
+ * periode `offset=0`. Ini yang dipakai fitur multi-sensor compare supaya dua
+ * periode dengan panjang sama bisa diletakkan di satu sumbu waktu relatif.
+ */
+function resolveWindow(range: HistoryQuery['range'], offset: number): { from: Date; to: Date } {
+  const span = RANGE_MS[range];
+  const to = new Date(Date.now() - offset * span);
+  return { from: new Date(to.getTime() - span), to };
+}
+
 sensorRouter.get(
   '/history',
   validateQuery(historyQuerySchema),
   async (req, res) => {
-    const { range } = getQuery<HistoryQuery>(res);
+    const { range, offset } = getQuery<HistoryQuery>(res);
     const bucketParam = req.query.bucket;
     const bucket = bucketParam ? Number(bucketParam) : defaultBucket(range);
 
-    const to = new Date();
-    const from = new Date(to.getTime() - RANGE_MS[range]);
+    const { from, to } = resolveWindow(range, offset);
 
     const [points, thresholds] = await Promise.all([
       db.queryReadings(DEVICE_ID, from, to, bucket),
@@ -46,6 +70,7 @@ sensorRouter.get(
 
     res.json({
       range,
+      offset,
       bucketSeconds: bucket,
       from: from.toISOString(),
       to: to.toISOString(),

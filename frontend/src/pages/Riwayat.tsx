@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, TrendingDown, TrendingUp } from 'lucide-react';
+import { Download, GitCompare, TrendingDown, TrendingUp } from 'lucide-react';
 import { HistoryChart } from '@/components/history/HistoryChart';
 import { TimeRangePicker } from '@/components/history/TimeRangePicker';
 import { useSensorStore } from '@/store/sensorStore';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { api, getToken } from '@/lib/api';
-import { SENSOR_META, type HistoryRange, type SensorName, type Thresholds } from '@/types';
+import {
+  SENSOR_META,
+  type HistoryPeriod,
+  type HistoryPoint,
+  type HistoryRange,
+  type SensorName,
+  type Thresholds,
+} from '@/types';
 import { cn, formatDateTime } from '@/lib/utils';
 
 const SENSORS: SensorName[] = ['suhu', 'humUdara', 'humTanah'];
@@ -23,23 +30,52 @@ const EMPTY_ACTIVE: Record<SensorName, boolean> = {
   humTanah: true,
 };
 
-type HistoryState = {
-  points: Awaited<ReturnType<typeof api.history>>['points'];
-  bucketSeconds: number;
-  from: string;
-  to: string;
-};
+function toPeriod(result: Awaited<ReturnType<typeof api.history>>): HistoryPeriod {
+  return {
+    range: result.range,
+    offset: result.offset,
+    bucketSeconds: result.bucketSeconds,
+    from: result.from,
+    to: result.to,
+    points: result.points,
+  };
+}
+
+/** Rata-rata tiap sensor, atau `null` untuk sensor yang tidak punya data. */
+function averages(points: HistoryPoint[]): Record<SensorName, number | null> {
+  const out = {} as Record<SensorName, number | null>;
+  for (const sensor of SENSORS) {
+    if (points.length === 0) {
+      out[sensor] = null;
+      continue;
+    }
+    out[sensor] = points.reduce((sum, p) => sum + p[sensor], 0) / points.length;
+  }
+  return out;
+}
 
 export function Riwayat() {
   const storeThresholds = useSensorStore((s) => s.thresholds);
   const reducedMotion = useReducedMotion();
 
   const [range, setRange] = useState<HistoryRange>('1h');
-  const [history, setHistory] = useState<HistoryState | null>(null);
+  const [compareOn, setCompareOn] = useState(false);
+  const [compareRange, setCompareRange] = useState<HistoryRange>('24h');
+  const [current, setCurrent] = useState<HistoryPeriod | null>(null);
+  const [comparePeriod, setComparePeriod] = useState<HistoryPeriod | null>(null);
   const [thresholds, setThresholds] = useState<Thresholds | null>(storeThresholds);
   const [active, setActive] = useState(EMPTY_ACTIVE);
   const [loading, setLoading] = useState(true);
+  const [compareLoading, setCompareLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Periode pembanding memakai rentang yang sama persis dengan periode utama
+   * agar tweak-nya tidak ambigu, dan baru bergeser ke `offset=1` kalau rentang
+   * yang dipilih identik. Dua rentang berbeda tetap dibandingkan pada posisi
+   * relatif, jadi hasilnya sah secara visual.
+   */
+  const compareOffset = compareRange === range ? 1 : 0;
 
   useEffect(() => {
     if (storeThresholds) setThresholds(storeThresholds);
@@ -73,12 +109,7 @@ export function Riwayat() {
       .history(range)
       .then((result) => {
         if (cancelled) return;
-        setHistory({
-          points: result.points,
-          bucketSeconds: result.bucketSeconds,
-          from: result.from,
-          to: result.to,
-        });
+        setCurrent(toPeriod(result));
         setThresholds(result.thresholds);
       })
       .catch((err: unknown) => {
@@ -94,8 +125,45 @@ export function Riwayat() {
     };
   }, [range]);
 
+  /**
+   * Periode pembanding dimuat terpisah supaya periode utama tidak ikut
+   * loading, dan kegagalan periode kedua tidak membatalkan grafik pertama.
+   */
+  useEffect(() => {
+    if (!compareOn) {
+      setComparePeriod(null);
+      setCompareLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCompareLoading(true);
+
+    void api
+      .history(compareRange, compareOffset)
+      .then((result) => {
+        if (!cancelled) setComparePeriod(toPeriod(result));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setComparePeriod(null);
+        setError(
+          err instanceof Error
+            ? `Gagal memuat periode pembanding: ${err.message}`
+            : 'Gagal memuat periode pembanding',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setCompareLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [compareOn, compareRange, compareOffset]);
+
   const stats = useMemo(() => {
-    const points = history?.points ?? [];
+    const points = current?.points ?? [];
     if (points.length === 0) return null;
 
     const result = {} as Record<SensorName, { min: number; max: number; avg: number; delta: number | null }>;
@@ -113,7 +181,13 @@ export function Riwayat() {
     }
 
     return result;
-  }, [history]);
+  }, [current]);
+
+  /** Rata-rata periode pembanding, dipakai untuk baris pembanding di kartu ringkasan. */
+  const compareAverages = useMemo(
+    () => (comparePeriod ? averages(comparePeriod.points) : null),
+    [comparePeriod],
+  );
 
   const toggleSensor = useCallback((sensor: SensorName) => {
     setActive((prev) => {
@@ -132,15 +206,27 @@ export function Riwayat() {
       const response = await fetch(api.exportUrl(range), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!response.ok) throw new Error('Gagal mengunduh CSV');
+
+      if (!response.ok) {
+        // Server membalas JSON untuk error, bukan CSV. Tampilkan pesan aslinya
+        // supaya "Gagal mengunduh" tidak menutupi penyebab sebenarnya.
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error ?? `Gagal mengunduh CSV (${response.status})`);
+      }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `greenhouse-${range}.csv`;
+
+      // Firefox hanya mengunduh link yang sudah menempel di DOM, dan revokeObjectURL
+      // yang dipanggil sinkron setelah click bisa membatalkan unduhan sebelum
+      // browser sempat membaca blob-nya.
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal mengunduh CSV');
     }
@@ -152,14 +238,30 @@ export function Riwayat() {
         <div>
           <h1 className="font-[family-name:var(--font-display)] text-[clamp(20px,3vw,28px)]">Riwayat</h1>
           <p className="mt-1 text-[14px] text-[color:var(--color-fg-muted)]">
-            {history
-              ? `${formatDateTime(history.from)} sampai ${formatDateTime(history.to)} · interval ${history.bucketSeconds} detik`
+            {current
+              ? `${formatDateTime(current.from)} sampai ${formatDateTime(current.to)} · interval ${current.bucketSeconds} detik`
               : 'Memuat data historis...'}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <TimeRangePicker range={range} onRangeChange={setRange} />
+
+          <button
+            type="button"
+            aria-pressed={compareOn}
+            onClick={() => setCompareOn((prev) => !prev)}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-[10px] border px-3 py-2 text-[13px] transition-colors',
+              compareOn
+                ? 'border-transparent bg-[color:var(--color-canopy)] text-[color:var(--color-bg-deep)]'
+                : 'border-[color:var(--color-border-strong)] hover:border-[color:var(--color-canopy)]',
+            )}
+          >
+            <GitCompare className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Bandingkan</span>
+          </button>
+
           <button
             type="button"
             onClick={() => void downloadCsv()}
@@ -170,6 +272,31 @@ export function Riwayat() {
           </button>
         </div>
       </header>
+
+      {compareOn && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[10px] border border-[color:var(--color-border)] bg-[color:var(--color-bg-deep)] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] text-[color:var(--color-fg-subtle)]">Bandingkan dengan</span>
+            <TimeRangePicker range={compareRange} onRangeChange={setCompareRange} />
+          </div>
+
+          <p className="text-[12px] text-[color:var(--color-fg-subtle)]">
+            {compareLoading && 'Memuat periode pembanding...'}
+            {!compareLoading && comparePeriod && (
+              <>
+                {formatDateTime(comparePeriod.from)} sampai {formatDateTime(comparePeriod.to)}
+                {compareOffset > 0 && (
+                  <span className="text-[color:var(--color-fg-muted)]">
+                    {' '}
+                    (periode sebelumnya)
+                  </span>
+                )}
+              </>
+            )}
+            {!compareLoading && !comparePeriod && 'Belum ada data periode pembanding.'}
+          </p>
+        </div>
+      )}
 
       {error && (
         <p
@@ -218,16 +345,26 @@ export function Riwayat() {
         </div>
 
         <HistoryChart
-          points={history?.points ?? []}
+          current={current}
+          compare={comparePeriod}
           active={active}
           thresholds={thresholds}
-          bucketSeconds={history?.bucketSeconds ?? 60}
           loading={loading}
         />
 
         <p className="mt-3 text-[12px] text-[color:var(--color-fg-subtle)]">
-          Batang menunjukkan rata-rata per interval, garis menunjukkan tren. Area hijau
-          menandai rentang ideal suhu.
+          {compareOn && comparePeriod ? (
+            <>
+              Sumbu X memakai waktu relatif terhadap ujung periode, jadi kedua garis bisa
+              Sumbu X memakai waktu relatif terhadap ujung periode, jadi kedua garis bisa
+              dibandingkan meski panjang rentangnya berbeda. Garis putus-putus adalah periode
+            </>
+          ) : (
+            <>
+              Batang menunjukkan rata-rata per interval, garis menunjukkan tren. Area hijau
+              menandai rentang ideal suhu.
+            </>
+          )}
         </p>
       </section>
 
@@ -237,6 +374,8 @@ export function Riwayat() {
             const stat = stats[sensor];
             const meta = SENSOR_META[sensor];
             const rising = (stat.delta ?? 0) > 0;
+            const before = compareAverages?.[sensor] ?? null;
+            const diff = before === null ? null : stat.avg - before;
 
             return (
               <motion.article
@@ -300,6 +439,38 @@ export function Riwayat() {
                     </div>
                   )}
                 </dl>
+
+                {compareAverages && before !== null && (
+                  <div className="mt-3 border-t border-[color:var(--color-border)] pt-3 text-[12px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[color:var(--color-fg-subtle)]">vs pembanding</span>
+                      <span className="value-tabular text-[color:var(--color-fg-muted)]">
+                        {before.toFixed(1)}
+                        {meta.unit}
+                      </span>
+                    </div>
+                    {diff !== null && (
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <span className="text-[color:var(--color-fg-subtle)]">Selisih</span>
+                        <span
+                          className="value-tabular font-medium"
+                          style={{
+                            color:
+                              Math.abs(diff) < 0.05
+                                ? 'var(--color-fg-muted)'
+                                : diff > 0
+                                  ? meta.accent
+                                  : 'var(--color-sun)',
+                          }}
+                        >
+                          {diff > 0 ? '+' : ''}
+                          {diff.toFixed(1)}
+                          {meta.unit}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </motion.article>
             );
           })}

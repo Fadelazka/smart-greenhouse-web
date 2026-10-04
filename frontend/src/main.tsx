@@ -17,3 +17,19 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 );
+
+/*
+ * Registrasi service worker (PWA offline).
+ *
+ * Registration dilewati sepenuhnya di mode dev: service worker akan
+ * menyajikan hasil build lama dari cache dan membuat hot reload
+ * tampak rusak. Pengguna baru menerima shell terbaru lewat reload biasa.
+ */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Kegagalan registrasi tidak boleh mengganggu aplikasi: tanpa SW,
+      // aplikasi tetap jalan online seperti biasa.
+    });
+  });
+}

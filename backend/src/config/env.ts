@@ -31,6 +31,27 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
   ALERT_COOLDOWN_SEC: z.coerce.number().int().min(0).default(300),
+
+  /**
+   * Fitur opsional. Semua default kosong / nonaktif supaya backend tetap bisa
+   * start tanpa kredensial tambahan, dan fiturnya sendiri melaporkan status
+   * "belum dikonfigurasi" alih-alih diam-diam gagal.
+   *
+   * Kunci cuaca sengaja TIDAK memakai prefix VITE_ dan tidak pernah dikirim ke
+   * browser: request cuaca diproxy backend supaya kuota API tidak bisa dipakai
+   * siapa pun yang membuka DevTools.
+   */
+  OPENWEATHER_API_KEY: z.string().default(''),
+  GREENHOUSE_LAT: z.string().default(''),
+  GREENHOUSE_LON: z.string().default(''),
+  GREENHOUSE_PLACE: z.string().default(''),
+
+  TELEGRAM_BOT_TOKEN: z.string().default(''),
+  TELEGRAM_CHAT_ID: z.string().default(''),
+  TELEGRAM_ENABLED: z
+    .string()
+    .default('true')
+    .transform((v) => v !== 'false'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -55,10 +76,29 @@ if (isProduction && raw.JWT_SECRET === 'dev-only-secret-change-me-please') {
 
 const hasDatabase = raw.SUPABASE_DB_URL.length > 0;
 
+/** Koordinat greenhouse yang dikonfigurasi, atau `null` kalau belum diisi. */
+const configuredCoords = (() => {
+  const lat = Number(raw.GREENHOUSE_LAT);
+  const lon = Number(raw.GREENHOUSE_LON);
+  const valid =
+    raw.GREENHOUSE_LAT.trim().length > 0 &&
+    raw.GREENHOUSE_LON.trim().length > 0 &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180;
+  return valid ? { lat, lon } : null;
+})();
+
 export const env = {
   ...raw,
   isProduction,
   hasDatabase,
+  hasWeatherKey: raw.OPENWEATHER_API_KEY.trim().length > 0,
+  hasTelegram: raw.TELEGRAM_BOT_TOKEN.trim().length > 0 && raw.TELEGRAM_CHAT_ID.trim().length > 0,
+  configuredCoords,
   corsOrigins: raw.CORS_ORIGIN.split(',')
     .map((s) => s.trim())
     .filter(Boolean),

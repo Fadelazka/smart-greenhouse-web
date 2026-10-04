@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Power, RotateCcw, Save, TriangleAlert } from 'lucide-react';
+import { IntegrationsPanel } from '@/components/settings/IntegrationsPanel';
 import { api } from '@/lib/api';
 import { SENSOR_META, type Calibration, type SensorName, type Thresholds } from '@/types';
 import { useAuthStore } from '@/store/authStore';
@@ -138,7 +139,8 @@ export function Pengaturan() {
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
             Anda masuk sebagai <strong>{user?.role ?? 'operator'}</strong>. Hanya admin yang
-            dapat menyimpan perubahan threshold dan me-restart perangkat.
+            dapat menyimpan perubahan threshold, me-restart perangkat, dan mengirim pesan uji
+            Telegram.
           </span>
         </p>
       )}
@@ -348,6 +350,8 @@ export function Pengaturan() {
           )}
         </section>
 
+        <IntegrationsPanel isAdmin={isAdmin} />
+
         <section className="glass flex flex-col gap-2 p-5">
           <h2 className="text-[15px] font-medium">Tentang sistem</h2>
           <p className="text-[13px] text-[color:var(--color-fg-muted)]">
@@ -356,7 +360,7 @@ export function Pengaturan() {
             tetap berjalan walau backend mati.
           </p>
           <p className="text-[12px] text-[color:var(--color-fg-subtle)]">
-            Green house Malam · design tokens dari PLANNING.md bagian 6
+            Greenhouse Malam · design tokens dari PLANNING.md bagian 6
           </p>
         </section>
       </div>

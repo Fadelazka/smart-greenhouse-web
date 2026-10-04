@@ -9,7 +9,10 @@ import type {
   HistoryRange,
   HistoryResponse,
   PublicUser,
+  TelegramStatus,
   Thresholds,
+  WeatherConfigStatus,
+  WeatherResult,
 } from '@/types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3001/api';
@@ -78,8 +81,13 @@ export const api = {
   /** Validasi token yang tersimpan dan ambil profil terbaru dari server. */
   me: () => request<{ user: PublicUser }>('/auth/me'),
 
-  history: (range: HistoryRange) =>
-    request<HistoryResponse>(`/sensors/history?range=${range}`),
+  /**
+   * `offset` menggeser jendela ke belakang sebanyak N kali panjang range, jadi
+   * `history('24h', 1)` mengambil 24 jam sebelum 24 jam terakhir. Dipakai fitur
+   * compare untuk periodicalkan dua rentang dengan panjang sama.
+   */
+  history: (range: HistoryRange, offset = 0) =>
+    request<HistoryResponse>(`/sensors/history?range=${range}&offset=${offset}`),
 
   latest: () => request<Record<string, number | string>>('/sensors/latest'),
 
@@ -136,4 +144,34 @@ export const api = {
     }),
 
   exportUrl: (range: HistoryRange) => `${API_URL}/sensors/export.csv?range=${range}`,
+
+  /**
+   * Cuaca di-proxy backend, bukan dipanggil langsung ke OpenWeatherMap.
+   *
+   * Karena itu tidak ada API key di frontend sama sekali. `lat`/`lon`
+   * opsional: kalau tidak dikirim, backend memakai GREENHOUSE_LAT/LON.
+   */
+  weather: (coords?: { lat: number; lon: number }) => {
+    const query =
+      coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon)
+        ? `?lat=${coords.lat.toFixed(4)}&lon=${coords.lon.toFixed(4)}`
+        : '';
+    return request<WeatherResult>(`/weather${query}`);
+  },
+
+  weatherStatus: () => request<WeatherConfigStatus>('/weather/status'),
+
+  telegramStatus: () => request<TelegramStatus>('/notifications/telegram'),
+
+  /**
+   * Pesan uji Telegram.
+   *
+   * Endpoint selalu membalas 200 dengan `{ ok, message }`, jadi `ok: false`
+   * berarti konfigurasi belum siap atau Telegram menolak, bukan request yang
+   * gagal. Pesan dari server ditampilkan apa adanya.
+   */
+  sendTelegramTest: () =>
+    request<{ ok: boolean; message: string }>('/notifications/telegram/test', {
+      method: 'POST',
+    }),
 };

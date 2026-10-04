@@ -49,6 +49,27 @@ export function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)} hari lalu`;
 }
 
+/**
+ * Label waktu relatif untuk sumbu grafik compare: jarak dari ujung periode.
+ *
+ * Format memakai konvensi `h` = hari dan `j` = jam yang sama dengan
+ * {@link formatUptime}, jadi `-2h 6j` berarti dua hari enam jam ke belakang.
+ */
+export function formatOffset(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '-';
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return 'sekarang';
+  if (minutes < 60) return `-${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const rest = minutes % 60;
+    return rest === 0 ? `-${hours}j` : `-${hours}j ${rest}m`;
+  }
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  return rest === 0 ? `-${days}h` : `-${days}h ${rest}j`;
+}
+
 /** Nilai sensor di luar batas = critical, mendekati batas = warning. */
 export function sensorState(
   value: number,

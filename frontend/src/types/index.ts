@@ -112,7 +112,6 @@ export type HardwareLogEntry = {
 };
 
 export type HistoryRange = '1h' | '6h' | '24h' | '7d';
-
 /**
  * Satu bucket hasil agregasi. `samples` dipakai untuk tooltip "rata-rata N
  * sampel" supaya pengguna tahu seberapa banyak data yang diringkas.
@@ -127,10 +126,28 @@ export type HistoryPoint = {
 
 export type HistoryResponse = {
   range: HistoryRange;
+  /** Berapa kali panjang range jendela digeser ke belakang. 0 = periode terkini. */
+  offset: number;
   bucketSeconds: number;
   from: string;
   to: string;
   thresholds: Thresholds;
+  points: HistoryPoint[];
+};
+
+/**
+ * Satu periode yang siap dibandingkan di halaman Riwayat.
+ *
+ * Compare menyelaraskan dua periode dengan panjang berbeda pada sumbu waktu
+ * relatif, jadi setiap periode harus membawa jendela waktunya sendiri supaya
+ * tooltip bisa menampilkan waktu absolut dari masing-masing sisi.
+ */
+export type HistoryPeriod = {
+  range: HistoryRange;
+  offset: number;
+  bucketSeconds: number;
+  from: string;
+  to: string;
   points: HistoryPoint[];
 };
 
@@ -195,4 +212,48 @@ export const ACTIVITY_META: Record<ActivityType, { label: string; color: string 
   alert: { label: 'Alert', color: 'var(--color-destructive)' },
   sensor_error: { label: 'Error sensor', color: 'var(--color-warning)' },
   login: { label: 'Login', color: 'var(--color-fg-subtle)' },
+};
+
+// ===== Cuaca real-time (F3.2) =====
+
+export type WeatherSnapshot = {
+  temp: number;
+  feelsLike: number;
+  humidity: number;
+  description: string;
+  icon: string;
+  windSpeed: number;
+  clouds: number;
+  observedAt: string;
+  place: string;
+};
+
+/**
+ * Balasan endpoint cuaca.
+ *
+ * `enabled: false` selalu disertai `hint` yang bisa langsung ditampilkan ke
+ * pengguna, jadi frontend tidak perlu membuat tebakan sendiri tentang penyebab
+ * kegagalan. `stale` berarti data dipakai dari cache karena OpenWeatherMap tidak
+ * bisa dihubungi.
+ */
+export type WeatherResult =
+  | { enabled: true; stale: boolean; data: WeatherSnapshot }
+  | {
+      enabled: false;
+      reason: 'no-key' | 'no-coords' | 'bad-key' | 'upstream-error';
+      hint: string;
+    };
+
+export type WeatherConfigStatus = {
+  enabled: boolean;
+  configuredLocation: { lat: number; lon: number; place: string } | null;
+};
+
+// ===== Notifikasi Telegram (F3.4) =====
+
+export type TelegramStatus = {
+  enabled: boolean;
+  reason: 'no-token' | 'no-chat-id' | 'disabled' | null;
+  maskedChatId: string | null;
+  cooldowns: Array<{ kind: string; remainingSec: number }>;
 };
