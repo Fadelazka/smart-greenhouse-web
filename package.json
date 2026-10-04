@@ -1,0 +1,35 @@
+{
+  "name": "smart-greenhouse-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Smart IoT Greenhouse - dashboard monitoring & kontrol greenhouse berbasis ESP32",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "simulator"
+  ],
+  "scripts": {
+    "dev:broker": "npm run dev:broker --workspace backend",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:simulator": "npm run dev --workspace simulator",
+    "dev": "node scripts/dev.mjs",
+    "dev:quick": "concurrently -k -n backend,frontend,simulator -c green,cyan,magenta \"npm:dev:backend\" \"npm:dev:frontend\" \"npm:dev:simulator\"",
+    "dev:start": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "dev:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop.ps1",
+    "build": "npm run build --workspace frontend && npm run build --workspace backend && npm run build --workspace simulator",
+    "typecheck": "npm run typecheck --workspace backend && npm run typecheck --workspace simulator && npm run typecheck --workspace frontend",
+    "db:setup": "npm run db:setup --workspace backend",
+    "db:seed": "npm run db:seed --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

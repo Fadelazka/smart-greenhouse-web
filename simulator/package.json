@@ -1,0 +1,21 @@
+{
+  "name": "@greenhouse/simulator",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Simulator ESP32 - publish telemetry MQTT realistis untuk development",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "mqtt": "^5.14.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3"
+  }
+}

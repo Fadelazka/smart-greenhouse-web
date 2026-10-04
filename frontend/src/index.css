@@ -1,0 +1,369 @@
+@import 'tailwindcss';
+/* Utilitas animasi shadcn/ui (animate-in, fade-in-*, zoom-in-*).
+   Wajib diimpor sebelum token supaya utility-nya tersedia untuk komponen
+   Dialog. */
+@import 'tw-animate-css';
+
+/* ==========================================================================
+   Design tokens - "Greenhouse Malam"
+   Darker green-leaning background, leaf green accent, soil/water/sun details.
+   Source: PLANNING.md section 6
+   ========================================================================== */
+
+@theme {
+  /* ---- Warna dasar ---- */
+  --color-bg: #0f1f1a; /* Deep Forest - background global */
+  --color-bg-deep: #0b1512; /* Night Canopy - latar terdalam */
+  --color-surface: #1b2a22; /* Leaf Slate - glass card */
+  --color-surface-raised: #23342a; /* Moss Surface - card hover, input */
+  --color-surface-soft: rgba(27, 42, 34, 0.6); /* glass fill */
+
+  /* ---- Aksen ---- */
+  --color-canopy: #22c55e; /* Canopy Green - CTA, healthy */
+  --color-canopy-deep: #16a34a; /* Deep Fern - hover */
+  --color-soil: #92400e; /* Soil Brown - baseline, card tanah */
+  --color-loam: #b45309; /* Loam Light - coklat gradient */
+  --color-water: #0ea5e9; /* Water Blue - humiditas, link */
+  --color-sun: #facc15; /* Sunlight Yellow - suhu, cahaya */
+  --color-bloom: #8b5cf6; /* Bloom Violet - indeks grafik keempat */
+
+  /* ---- Teks ---- */
+  --color-fg: #f0fdf4; /* Leaf White - teks utama, kontras ~16:1 */
+  --color-fg-muted: #94a3b8; /* Sage Grey - teks sekunder, kontras ~6.5:1 */
+  --color-fg-subtle: #64748b; /* teks tersier, hanya dekoratif */
+
+  /* ---- Border & state ---- */
+  --color-border: rgba(240, 253, 244, 0.12);
+  --color-border-strong: rgba(240, 253, 244, 0.22);
+  --color-destructive: #ef4444; /* Alert Red */
+  --color-warning: #f59e0b; /* Caution Amber */
+  --color-success: #22c55e; /* Fresh Green */
+
+  /* ---- Tipografi ---- */
+  --font-display: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+
+  /* ---- Motion tokens (lihat PLANNING.md 7.1) ---- */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---- Radius ---- */
+  --radius-card: 16px;
+  --radius-control: 10px;
+
+  /* ======================================================================
+     Alias untuk shadcn/ui
+
+     shadcn/ui menyebut warna dalam skema --background / --foreground /
+     --primary / --muted / ... supaya komponennya bisa langsung dipakai.
+     Daripada menduplikasi nilai hex (yang membuat token kita dan token
+     shadcn bisa berbeda diam-diam), setiap alias di sini menunjuk ke token
+     milik proyek ini di atas. Sumber kebenaran tetap 20 token "Greenhouse
+     Malam"; alias ini hanya lapisan konvensi agar tidak bentrok dengan
+     komponen shadcn.
+     ====================================================================== */
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-fg);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-fg);
+  --color-popover: var(--color-surface-raised);
+  --color-popover-foreground: var(--color-fg);
+  --color-primary: var(--color-canopy);
+  --color-primary-foreground: var(--color-bg-deep);
+  --color-secondary: var(--color-surface-raised);
+  --color-secondary-foreground: var(--color-fg);
+  --color-muted: var(--color-surface-soft);
+  --color-muted-foreground: var(--color-fg-muted);
+  --color-accent: var(--color-surface-raised);
+  --color-accent-foreground: var(--color-fg);
+  --color-destructive-foreground: var(--color-fg);
+  --color-input: var(--color-border-strong);
+  --color-ring: var(--color-canopy);
+
+  /* Radius yang dibaca shadcn. Sengaja memakai --radius-control agar
+     konsisten dengan BorderRadius 10px yang sudah dipakai proyek ini. */
+  --radius-lg: var(--radius-card);
+  --radius-md: var(--radius-control);
+  --radius-sm: calc(var(--radius-control) - 4px);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    margin: 0;
+  }
+
+  /* Angka sensor tidak boleh "jitter" saat count-up */
+  .value-tabular,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus ring wajib terlihat untuk navigasi keyboard */
+  :focus-visible {
+    outline: 2px solid var(--color-canopy);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-canopy) 35%, transparent);
+    color: var(--color-fg);
+  }
+
+  /* Scrollbar bergaya greenhouse */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg-deep);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-raised);
+    border-radius: 99px;
+    border: 2px solid var(--color-bg-deep);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--color-canopy) 45%, var(--color-surface-raised));
+  }
+}
+
+/* ==========================================================================
+   Komponen reusable
+   ========================================================================== */
+
+@layer components {
+  /* Glass card - bahan utama seluruh dashboard */
+  .glass {
+    background-color: var(--color-surface-soft);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+  }
+
+  .glass-strong {
+    background-color: color-mix(in oklab, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-card);
+  }
+
+  /* Grain halus supaya background tidak terasa flat */
+  .grain::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Ripple saat klik (untuk tombol kontrol) */
+  .ripple-host {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .ripple-dot {
+    position: absolute;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--color-fg) 55%, transparent);
+    transform: scale(0);
+    pointer-events: none;
+    animation: ripple-out 600ms var(--ease-out) forwards;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface) 0%,
+      var(--color-surface-raised) 50%,
+      var(--color-surface) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.4s ease-in-out infinite;
+    border-radius: 8px;
+  }
+
+  /* Tooltip daun - bentuk dari border-radius asimetris, tanpa aset gambar.
+     Dua sudut dibulatkan penuh supaya terbaca seperti daun, dua sudut lain
+     dibuat tumpul supaya tidak terlihat seperti panah. */
+  .leaf-tooltip {
+    position: relative;
+    padding: 10px 13px;
+    background-color: color-mix(in oklab, var(--color-surface) 92%, transparent);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 18px 6px 18px 6px;
+    box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.55);
+    min-width: 168px;
+  }
+
+  /* Tulang daun, tipis dan samar - bentuknya terbaca tanpa mengganggu angka */
+  .leaf-tooltip-vein {
+    position: absolute;
+    inset: 4px;
+    border-radius: 14px 4px 14px 4px;
+    border-top: 1px solid color-mix(in oklab, var(--color-canopy) 22%, transparent);
+    border-left: 1px solid color-mix(in oklab, var(--color-canopy) 14%, transparent);
+    pointer-events: none;
+  }
+
+  /* Tangkai kecil di bawah, mengarah ke titik data */
+  .leaf-tooltip-stem {
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    transform: translateX(-50%) rotate(45deg);
+    background-color: color-mix(in oklab, var(--color-surface) 92%, transparent);
+    border-right: 1px solid var(--color-border-strong);
+    border-bottom: 1px solid var(--color-border-strong);
+    pointer-events: none;
+  }
+
+  /* Denyut alert - maksimal 1 denyut per 1.8s, tidak agresif */
+  .pulse-critical {
+    animation: pulse-critical 1.8s ease-in-out infinite;
+  }
+  .pulse-warning {
+    animation: pulse-warning 2.4s ease-in-out infinite;
+  }
+}
+
+/* ==========================================================================
+   Keyframes
+   ========================================================================== */
+
+@keyframes ripple-out {
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+@keyframes skeleton-sweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse-critical {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(239, 68, 68, 0),
+      0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(239, 68, 68, 0.5),
+      0 0 24px 4px rgba(239, 68, 68, 0.32);
+  }
+}
+
+@keyframes pulse-warning {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(245, 158, 11, 0),
+      0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(245, 158, 11, 0.45),
+      0 0 18px 3px rgba(245, 158, 11, 0.25);
+  }
+}
+
+@keyframes leaf-sway {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.38;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ==========================================================================
+   Aksesibilitas: hormati preferensi pengguna
+   Semua animasi dimatikan, tampilan langsung state final.
+   Lihat PLANNING.md 7.8
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Helper yang dipakai komponen untuk lendo preferensi reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-only {
+    display: none !important;
+  }
+}
